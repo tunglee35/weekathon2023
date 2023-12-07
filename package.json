@@ -4,9 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "serve": "flask --app ./src/server.py --debug run",
+    "serve": "python ./src/server.py",
     "env": "virtualenv -p python3 .venv && source .venv/bin/activate",
-    "install": "pip install -r requirement.txt"
+    "install": "pip install -r requirements.txt"
   },
   "keywords": [],
   "author": "",
