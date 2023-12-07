@@ -1,0 +1,14 @@
+{
+  "name": "weekathon2023",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "serve": "flask --app ./src/server.py --debug run",
+    "env": "virtualenv -p python3 .venv && source .venv/bin/activate",
+    "install": "pip install -r requirement.txt"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
