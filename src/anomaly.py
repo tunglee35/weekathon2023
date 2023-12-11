@@ -78,7 +78,8 @@ def process_anomalies(data):
     },
     'anomal_metadata': {
       'direction': ''
-    }
+    },
+    'anomal_summary': summary,
     # 'moving_average': {
     #   'label': 'Moving Average',
     #   'data': moving_avg.tolist(),
