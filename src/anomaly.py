@@ -1,17 +1,33 @@
 import numpy as np
-from sklearn.ensemble import IsolationForest
 
-def find_anomalies(list):
-  v = np.reshape(list, (-1, 1))
-  clf = IsolationForest(random_state=0, contamination=0.1).fit(v)
-  return clf.predict(v)
+def moving_average(data, window_size):
+  cumsum = np.cumsum(data, dtype=float)
+  cumsum[window_size:] = cumsum[window_size:] - cumsum[:-window_size]
+  return cumsum[window_size - 1:] / window_size
+
+def detect_anomalies(data, window_size, threshold=2.0):
+  moving_avg = moving_average(data, window_size)
+  deviation = np.abs(data[window_size - 1:] - moving_avg)
+  std_dev = np.std(deviation)
+  lower_bound = moving_avg - threshold * std_dev
+  upper_bound = moving_avg + threshold * std_dev
+  anomalies = ((data[window_size - 1:] < lower_bound) | (data[window_size - 1:] > upper_bound)).astype(int)
+
+  # Prepend empty values
+  anomalies = np.concatenate([np.zeros(window_size - 1), anomalies])
+  moving_avg = np.concatenate([np.zeros(window_size - 1), moving_avg])
+  lower_bound = np.concatenate([np.zeros(window_size - 1), lower_bound])
+  upper_bound = np.concatenate([np.zeros(window_size - 1), upper_bound])
+
+  return anomalies, moving_avg, lower_bound, upper_bound
 
 def process_anomalies(data):
   dates = data['dates']['data']
   date_label = data['dates']['label']
   values = data['values']['data']
   value_label = data['values']['label']
-  prediction = find_anomalies(values)
+
+  prediction, moving_avg, lower_bound, upper_bound = detect_anomalies(values, window_size=6, threshold=3.269)
 
   anomalies = {
     'dates': {
@@ -25,21 +41,56 @@ def process_anomalies(data):
     'count': 0,
   }
 
-  for idx, predict in enumerate(prediction.tolist()):
-    if predict == -1:
+  anomalies_indexes = []
+
+  for idx, predict in enumerate(prediction):
+    if predict == 1:
       anomalies['dates']['data'].append(dates[idx])
       anomalies['values']['data'].append(values[idx])
       anomalies['count'] += 1
+      anomalies_indexes.append(idx)
 
-  summary_body = ''
+  summary = []
+  anomal_summary_body = ''
+  anomal_summary_title = ''
   if anomalies['count'] > 0:
-    summary_body = f"The most recent anomaly was on **{anomalies['dates']['data'][-1]}** when **{value_label}** had value of **{anomalies['values']['data'][-1]}**"
+    date = anomalies['dates']['data'][-1]
+    y = anomalies['values']['data'][-1]
+    l = np.round(lower_bound[anomalies_indexes[-1]], 2)
+    h = np.round(upper_bound[anomalies_indexes[-1]], 2)
 
+    anomal_summary_title = f'Recent anomalies in **{value_label}**'
+    anomal_summary_body += f"The most recent anomaly was on **{date}** when **{value_label}** had value of **{y}**. "
+    direction = 'increase' if y > h else 'decrease'
+    anomal_summary_body += f"Which is out of the expected range of {l} - {h}, "
+    anomal_summary_body += f"indicating a significant {direction} compared to the expected or historical patterns."
+
+    summary.append(anomal_summary_title)
+    summary.append(anomal_summary_body)
+
+
+  cols = [date_label, 'Moving Average', 'Lower Bound', 'Upper Bound', 'Is Anomaly']
+  values = list(zip(dates, moving_avg, lower_bound, upper_bound, prediction))
   return {
-    'anomalies': anomalies,
-    'count': anomalies['count'],
-    'summary': {
-      'title': '' if anomalies['count'] == 0 else f'Recent anomalies in **{value_label}**',
-      'body': summary_body
+    'anomal_value': {
+      'labels': cols,
+      'values': values,
+    },
+    'anomal_metadata': {
+      'direction': ''
     }
+    # 'moving_average': {
+    #   'label': 'Moving Average',
+    #   'data': moving_avg.tolist(),
+    # },
+    # 'lower_bound': {
+    #   'label': 'Lower Bound',
+    #   'data': lower_bound.tolist()
+    # },
+    # 'upper_bound': {
+    #   'label': 'Upper Bound',
+    #   'data': upper_bound.tolist()
+    # },
+    # 'anomalies': anomalies,
+    # 'summary': summary
   }
